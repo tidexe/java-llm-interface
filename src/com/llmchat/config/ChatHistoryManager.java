@@ -86,6 +86,9 @@ public class ChatHistoryManager {
                 try (ObjectOutputStream sessionOos = new ObjectOutputStream(
                         new FileOutputStream(sessionFile.toString()))) {
                     sessionOos.writeObject(session);
+                } catch (Exception e) {
+                    // 单个会话保存失败，记录错误后继续
+                    e.printStackTrace();
                 }
             }
         } catch (Exception e) {
