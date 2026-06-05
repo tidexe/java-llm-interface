@@ -88,11 +88,11 @@ public class ChatHistoryManager {
                     sessionOos.writeObject(session);
                 } catch (Exception e) {
                     // 单个会话保存失败，记录错误后继续
-                    e.printStackTrace();
+                    System.err.println("保存会话失败 [" + session.getId() + "]: " + e.getMessage());
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("保存历史记录失败: " + e.getMessage());
         }
     }
     
