@@ -89,10 +89,12 @@ public class ChatHistoryManager {
                 } catch (Exception e) {
                     // 单个会话保存失败，记录错误后继续
                     System.err.println("保存会话失败 [" + session.getId() + "]: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         } catch (Exception e) {
             System.err.println("保存历史记录失败: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
