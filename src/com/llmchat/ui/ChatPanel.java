@@ -1,7 +1,9 @@
 package com.llmchat.ui;
 
+import com.llmchat.config.ChatHistoryManager;
 import com.llmchat.config.ConfigManager;
 import com.llmchat.model.ChatMessage;
+import com.llmchat.model.ChatSession;
 import com.llmchat.model.Config;
 import com.llmchat.http.HttpClient;
 import com.llmchat.ui.components.*;
@@ -20,8 +22,11 @@ public class ChatPanel extends JPanel {
     private static final Color BACKGROUND_COLOR = new Color(245, 245, 245);
     
     private final ConfigManager configManager;
+    private final ChatHistoryManager historyManager;
     private final HttpClient httpClient;
-    private final List<ChatMessage> messageHistory;
+    
+    private String currentSessionId;
+    private List<ChatMessage> messageHistory;
     
     private JPanel messagesPanel;
     private JScrollPane messagesScrollPane;
@@ -31,13 +36,27 @@ public class ChatPanel extends JPanel {
     private MessageBubble currentResponseBubble;
     private StringBuilder currentResponse;
     
-    public ChatPanel(ConfigManager configManager) {
+    private ChatPanelListener listener;
+    
+    public interface ChatPanelListener {
+        void onSessionUpdated();
+    }
+    
+    public ChatPanel(ConfigManager configManager, ChatHistoryManager historyManager) {
         this.configManager = configManager;
+        this.historyManager = historyManager;
         this.httpClient = new HttpClient();
         this.messageHistory = new ArrayList<>();
         this.currentResponse = new StringBuilder();
         
         initializeUI();
+        
+        // 加载第一个会话
+        loadSession(historyManager.getFirstSessionId());
+    }
+    
+    public void setChatPanelListener(ChatPanelListener listener) {
+        this.listener = listener;
     }
     
     private void initializeUI() {
@@ -63,9 +82,6 @@ public class ChatPanel extends JPanel {
         
         add(messagesScrollPane, BorderLayout.CENTER);
         add(inputPanel, BorderLayout.SOUTH);
-        
-        // 添加欢迎消息
-        addWelcomeMessage();
     }
     
     private JPanel createInputPanel() {
@@ -107,7 +123,49 @@ public class ChatPanel extends JPanel {
         return panel;
     }
     
-    private void addWelcomeMessage() {
+    /**
+     * 加载指定会话
+     */
+    public void loadSession(String sessionId) {
+        if (sessionId == null) return;
+        
+        // 如果正在加载，先停止
+        if (loadingIndicator.isRunning()) {
+            return;
+        }
+        
+        this.currentSessionId = sessionId;
+        ChatSession session = historyManager.getSession(sessionId);
+        
+        if (session != null) {
+            this.messageHistory = new ArrayList<>(session.getMessages());
+            displayMessages();
+        } else {
+            this.messageHistory = new ArrayList<>();
+            displayWelcomeMessage();
+        }
+    }
+    
+    /**
+     * 显示消息列表
+     */
+    private void displayMessages() {
+        messagesPanel.removeAll();
+        
+        if (messageHistory.isEmpty()) {
+            displayWelcomeMessage();
+        } else {
+            for (ChatMessage msg : messageHistory) {
+                addMessageBubble(msg, msg.getRole() == ChatMessage.Role.USER);
+            }
+        }
+        
+        messagesPanel.revalidate();
+        messagesPanel.repaint();
+        scrollToBottom();
+    }
+    
+    private void displayWelcomeMessage() {
         JPanel welcomePanel = new JPanel(new BorderLayout());
         welcomePanel.setBackground(BACKGROUND_COLOR);
         welcomePanel.setBorder(new EmptyBorder(50, 0, 0, 0));
@@ -157,7 +215,13 @@ public class ChatPanel extends JPanel {
         // 添加用户消息
         ChatMessage userMessage = new ChatMessage(ChatMessage.Role.USER, text);
         messageHistory.add(userMessage);
+        historyManager.addMessageToSession(currentSessionId, userMessage);
         addMessageBubble(userMessage, true);
+        
+        // 通知会话更新
+        if (listener != null) {
+            listener.onSessionUpdated();
+        }
         
         // 清空输入框
         inputArea.clear();
@@ -204,7 +268,13 @@ public class ChatPanel extends JPanel {
                         currentResponse.toString()
                     );
                     messageHistory.add(completeMessage);
+                    historyManager.addMessageToSession(currentSessionId, completeMessage);
                     currentResponseBubble = null;
+                    
+                    // 通知会话更新
+                    if (listener != null) {
+                        listener.onSessionUpdated();
+                    }
                 });
             }
             
@@ -257,20 +327,16 @@ public class ChatPanel extends JPanel {
     }
     
     /**
-     * 清空聊天记录
+     * 获取当前会话ID
      */
-    public void clearChat() {
-        messageHistory.clear();
-        messagesPanel.removeAll();
-        addWelcomeMessage();
-        messagesPanel.revalidate();
-        messagesPanel.repaint();
+    public String getCurrentSessionId() {
+        return currentSessionId;
     }
     
     /**
-     * 获取消息历史
+     * 刷新当前会话显示
      */
-    public List<ChatMessage> getMessageHistory() {
-        return new ArrayList<>(messageHistory);
+    public void refreshCurrentSession() {
+        loadSession(currentSessionId);
     }
 }

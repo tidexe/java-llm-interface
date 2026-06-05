@@ -1,6 +1,9 @@
 package com.llmchat.ui;
 
+import com.llmchat.config.ChatHistoryManager;
 import com.llmchat.config.ConfigManager;
+import com.llmchat.model.ChatSession;
+import com.llmchat.ui.components.ChatListPanel;
 import com.llmchat.ui.components.ModernButton;
 
 import javax.swing.*;
@@ -8,6 +11,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.List;
 
 /**
  * 主窗口 - 应用程序主界面
@@ -18,10 +22,14 @@ public class MainFrame extends JFrame {
     private static final Color BACKGROUND_COLOR = new Color(245, 245, 245);
     
     private final ConfigManager configManager;
+    private final ChatHistoryManager historyManager;
+    
     private ChatPanel chatPanel;
+    private ChatListPanel chatListPanel;
     
     public MainFrame() {
         this.configManager = new ConfigManager();
+        this.historyManager = new ChatHistoryManager();
         
         initializeUI();
         setupWindowListener();
@@ -30,8 +38,8 @@ public class MainFrame extends JFrame {
     private void initializeUI() {
         setTitle(APP_TITLE);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        setSize(900, 700);
-        setMinimumSize(new Dimension(600, 500));
+        setSize(1100, 750);
+        setMinimumSize(new Dimension(800, 600));
         setLocationRelativeTo(null);
         
         // 主面板
@@ -41,13 +49,55 @@ public class MainFrame extends JFrame {
         // 头部工具栏
         JPanel headerPanel = createHeaderPanel();
         
+        // 内容面板（侧边栏 + 聊天面板）
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        contentPanel.setBackground(BACKGROUND_COLOR);
+        
+        // 侧边栏
+        chatListPanel = new ChatListPanel();
+        chatListPanel.setChatListListener(new ChatListPanel.ChatListListener() {
+            @Override
+            public void onSessionSelected(String sessionId) {
+                chatPanel.loadSession(sessionId);
+                refreshChatList();
+            }
+            
+            @Override
+            public void onSessionDeleted(String sessionId) {
+                historyManager.deleteSession(sessionId);
+                String firstSessionId = historyManager.getFirstSessionId();
+                chatPanel.loadSession(firstSessionId);
+                refreshChatList();
+            }
+            
+            @Override
+            public void onNewChatClicked() {
+                ChatSession newSession = historyManager.createNewSession();
+                chatPanel.loadSession(newSession.getId());
+                refreshChatList();
+            }
+        });
+        
         // 聊天面板
-        chatPanel = new ChatPanel(configManager);
+        chatPanel = new ChatPanel(configManager, historyManager);
+        chatPanel.setChatPanelListener(() -> refreshChatList());
+        
+        // 分隔线
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, chatListPanel, chatPanel);
+        splitPane.setDividerLocation(250);
+        splitPane.setDividerSize(1);
+        splitPane.setBorder(null);
+        splitPane.setBackground(new Color(220, 220, 220));
+        
+        contentPanel.add(splitPane, BorderLayout.CENTER);
         
         mainPanel.add(headerPanel, BorderLayout.NORTH);
-        mainPanel.add(chatPanel, BorderLayout.CENTER);
+        mainPanel.add(contentPanel, BorderLayout.CENTER);
         
         setContentPane(mainPanel);
+        
+        // 初始化聊天列表
+        refreshChatList();
     }
     
     private JPanel createHeaderPanel() {
@@ -64,24 +114,6 @@ public class MainFrame extends JFrame {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttonPanel.setBackground(HEADER_COLOR);
         
-        // 新对话按钮
-        JButton newChatButton = new JButton("新对话");
-        newChatButton.setFont(new Font("Microsoft YaHei", Font.PLAIN, 13));
-        newChatButton.setPreferredSize(new Dimension(80, 32));
-        newChatButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        newChatButton.addActionListener(e -> {
-            int result = JOptionPane.showConfirmDialog(
-                this,
-                "确定要开始新对话吗？当前对话将被清空。",
-                "新对话",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE
-            );
-            if (result == JOptionPane.YES_OPTION) {
-                chatPanel.clearChat();
-            }
-        });
-        
         // 设置按钮
         JButton settingsButton = new JButton("设置");
         settingsButton.setFont(new Font("Microsoft YaHei", Font.PLAIN, 13));
@@ -92,7 +124,6 @@ public class MainFrame extends JFrame {
             dialog.setVisible(true);
         });
         
-        buttonPanel.add(newChatButton);
         buttonPanel.add(settingsButton);
         
         panel.add(titleLabel, BorderLayout.WEST);
@@ -126,10 +157,20 @@ public class MainFrame extends JFrame {
                     JOptionPane.QUESTION_MESSAGE
                 );
                 if (result == JOptionPane.YES_OPTION) {
+                    historyManager.saveHistory();
                     dispose();
                     System.exit(0);
                 }
             }
         });
+    }
+    
+    /**
+     * 刷新聊天列表
+     */
+    private void refreshChatList() {
+        List<ChatSession> sessions = historyManager.getAllSessions();
+        String currentSessionId = chatPanel.getCurrentSessionId();
+        chatListPanel.updateChatList(sessions, currentSessionId);
     }
 }

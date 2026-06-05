@@ -92,9 +92,28 @@ public class MessageBubble extends JPanel {
                 StyledDocument doc = textPane.getStyledDocument();
                 Style style = textPane.getStyle("MessageStyle");
                 doc.insertString(doc.getLength(), text, style);
-                // 触发重绘以更新显示
-                textPane.revalidate();
-                textPane.repaint();
+                
+                // 重新计算文本面板大小以触发换行
+                int maxWidth = MAX_WIDTH - 24;
+                textPane.setSize(maxWidth, Integer.MAX_VALUE);
+                
+                // 触发完整的布局更新链
+                revalidate();
+                repaint();
+                
+                // 通知父容器更新
+                Container parent = getParent();
+                if (parent != null) {
+                    parent.revalidate();
+                    parent.repaint();
+                    
+                    // 再往上一级确保更新
+                    Container grandParent = parent.getParent();
+                    if (grandParent != null) {
+                        grandParent.revalidate();
+                        grandParent.repaint();
+                    }
+                }
             } catch (BadLocationException e) {
                 e.printStackTrace();
             }
