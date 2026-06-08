@@ -12,7 +12,7 @@ import java.util.Base64;
  * 配置管理器 - 负责配置的持久化存储
  */
 public class ConfigManager {
-    private static final String CONFIG_DIR = System.getProperty("user.home") + "/.llmchat";
+    private static final String CONFIG_DIR = System.getProperty("user.dir") + "/.llmchat";
     private static final String CONFIG_FILE = CONFIG_DIR + "/config.dat";
     
     private Config config;

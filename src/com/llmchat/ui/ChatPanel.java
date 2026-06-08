@@ -32,7 +32,6 @@ public class ChatPanel extends JPanel {
     private JScrollPane messagesScrollPane;
     private ModernTextArea inputArea;
     private ModernButton sendButton;
-    private LoadingIndicator loadingIndicator;
     private MessageBubble currentResponseBubble;
     private StringBuilder currentResponse;
     
@@ -101,7 +100,7 @@ public class ChatPanel extends JPanel {
             }
         });
         
-        // 右侧面板（发送按钮和加载指示器）
+        // 右侧面板（发送按钮）
         JPanel rightPanel = new JPanel();
         rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
         rightPanel.setBackground(BACKGROUND_COLOR);
@@ -109,12 +108,8 @@ public class ChatPanel extends JPanel {
         sendButton = new ModernButton("发送");
         sendButton.addActionListener(e -> sendMessage());
         
-        loadingIndicator = new LoadingIndicator();
-        
         rightPanel.add(Box.createVerticalGlue());
         rightPanel.add(sendButton);
-        rightPanel.add(Box.createRigidArea(new Dimension(0, 5)));
-        rightPanel.add(loadingIndicator);
         rightPanel.add(Box.createVerticalGlue());
         
         panel.add(inputArea, BorderLayout.CENTER);
@@ -130,7 +125,7 @@ public class ChatPanel extends JPanel {
         if (sessionId == null) return;
         
         // 如果正在加载，先停止
-        if (loadingIndicator.isRunning()) {
+        if (sendButton.isLoading()) {
             return;
         }
         
@@ -193,7 +188,7 @@ public class ChatPanel extends JPanel {
     
     private void sendMessage() {
         String text = inputArea.getText().trim();
-        if (text.isEmpty() || loadingIndicator.isRunning()) {
+        if (text.isEmpty() || sendButton.isLoading()) {
             return;
         }
         
@@ -227,8 +222,7 @@ public class ChatPanel extends JPanel {
         inputArea.clear();
         
         // 显示加载状态
-        loadingIndicator.start();
-        sendButton.setEnabled(false);
+        sendButton.setLoading(true);
         
         // 准备接收响应
         currentResponse = new StringBuilder();
@@ -259,8 +253,7 @@ public class ChatPanel extends JPanel {
             @Override
             public void onComplete() {
                 SwingUtilities.invokeLater(() -> {
-                    loadingIndicator.stop();
-                    sendButton.setEnabled(true);
+                    sendButton.setLoading(false);
                     
                     // 保存完整的响应消息
                     ChatMessage completeMessage = new ChatMessage(
@@ -281,8 +274,7 @@ public class ChatPanel extends JPanel {
             @Override
             public void onError(String error) {
                 SwingUtilities.invokeLater(() -> {
-                    loadingIndicator.stop();
-                    sendButton.setEnabled(true);
+                    sendButton.setLoading(false);
                     
                     // 移除空的响应气泡
                     if (currentResponseBubble != null) {

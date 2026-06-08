@@ -175,9 +175,7 @@ public class SettingsDialog extends JDialog {
         ModernButton saveButton = new ModernButton("保存");
         saveButton.addActionListener(e -> saveConfig());
         
-        JButton cancelButton = new JButton("取消");
-        cancelButton.setFont(new Font("Microsoft YaHei", Font.PLAIN, 13));
-        cancelButton.setPreferredSize(new Dimension(80, 36));
+        ModernButton cancelButton = new ModernButton("取消");
         cancelButton.addActionListener(e -> dispose());
         
         panel.add(cancelButton);

@@ -1,3 +1,7 @@
+# 设置控制台编码为 UTF-8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 # 编译脚本 - PowerShell版本
 Write-Host "正在编译 LLM Chat 应用程序..." -ForegroundColor Green
 
