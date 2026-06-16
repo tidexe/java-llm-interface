@@ -1,0 +1,67 @@
+schema_version: 1
+module_path: ""
+title: LLM 聊天桌面客户端
+scope:
+    - .gitignore
+    - compile.bat
+    - compile.ps1
+    - run.bat
+    - run.ps1
+    - .llmchat\config.dat
+    - .llmchat\答辩问题库.md
+    - .qoder\repowiki\project-wiki.md
+    - bin\com\llmchat\App.class
+    - bin\com\llmchat\config\ChatHistoryManager.class
+    - bin\com\llmchat\config\ConfigManager.class
+    - bin\com\llmchat\http\HttpClient$StreamCallback.class
+    - bin\com\llmchat\http\HttpClient.class
+    - bin\com\llmchat\model\ChatMessage$Role.class
+    - bin\com\llmchat\model\ChatMessage.class
+    - bin\com\llmchat\model\ChatSession.class
+    - bin\com\llmchat\model\Config.class
+    - bin\com\llmchat\ui\ChatPanel$1.class
+    - bin\com\llmchat\ui\ChatPanel$2.class
+    - bin\com\llmchat\ui\ChatPanel$ChatPanelListener.class
+    - bin\com\llmchat\ui\ChatPanel$ScrollableMessagesPanel.class
+    - bin\com\llmchat\ui\ChatPanel.class
+    - bin\com\llmchat\ui\MainFrame$1.class
+    - bin\com\llmchat\ui\MainFrame$2.class
+    - bin\com\llmchat\ui\MainFrame.class
+    - bin\com\llmchat\ui\SettingsDialog.class
+    - bin\com\llmchat\ui\components\ChatListPanel$ChatItemPanel$1.class
+    - bin\com\llmchat\ui\components\ChatListPanel$ChatItemPanel.class
+    - bin\com\llmchat\ui\components\ChatListPanel$ChatListListener.class
+    - bin\com\llmchat\ui\components\ChatListPanel$RoundedChatItem$1.class
+    - bin\com\llmchat\ui\components\ChatListPanel$RoundedChatItem.class
+    - bin\com\llmchat\ui\components\ChatListPanel.class
+    - bin\com\llmchat\ui\components\LoadingIndicator.class
+    - bin\com\llmchat\ui\components\MarkdownRenderer$1.class
+    - bin\com\llmchat\ui\components\MarkdownRenderer$Block.class
+    - bin\com\llmchat\ui\components\MarkdownRenderer.class
+    - bin\com\llmchat\ui\components\MessageBubble.class
+    - bin\com\llmchat\ui\components\ModernButton$1.class
+    - bin\com\llmchat\ui\components\ModernButton.class
+    - bin\com\llmchat\ui\components\ModernTextArea$1.class
+    - bin\com\llmchat\ui\components\ModernTextArea.class
+    - bin\com\llmchat\ui\components\ModernTextField$1.class
+    - bin\com\llmchat\ui\components\ModernTextField.class
+    - bin\com\llmchat\ui\components\RoundedBorder.class
+    - src\com\llmchat\App.java
+    - src\com\llmchat\config\ChatHistoryManager.java
+    - src\com\llmchat\config\ConfigManager.java
+    - src\com\llmchat\http\HttpClient.java
+    - src\com\llmchat\model\ChatMessage.java
+    - src\com\llmchat\model\ChatSession.java
+    - src\com\llmchat\model\Config.java
+    - src\com\llmchat\ui\ChatPanel.java
+    - src\com\llmchat\ui\MainFrame.java
+    - src\com\llmchat\ui\SettingsDialog.java
+    - src\com\llmchat\ui\components\ChatListPanel.java
+    - src\com\llmchat\ui\components\LoadingIndicator.java
+    - src\com\llmchat\ui\components\MessageBubble.java
+    - src\com\llmchat\ui\components\ModernButton.java
+    - src\com\llmchat\ui\components\ModernTextArea.java
+    - src\com\llmchat\ui\components\ModernTextField.java
+source_files: []
+depends_on: []
+related_to: []

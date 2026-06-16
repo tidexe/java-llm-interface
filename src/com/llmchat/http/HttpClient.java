@@ -11,9 +11,13 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * HTTP客户端 - 支持流式响应
+ * HTTP客户端 - 支持流式响应和请求取消
  */
 public class HttpClient {
+    
+    private volatile boolean cancelled = false;
+    private volatile Thread requestThread;
+    private volatile HttpURLConnection currentConnection;
     
     /**
      * 流式响应回调接口
@@ -22,6 +26,31 @@ public class HttpClient {
         void onChunk(String chunk);
         void onComplete();
         void onError(String error);
+        void onCancelled();
+    }
+    
+    /**
+     * 取消当前正在进行的请求
+     */
+    public void cancel() {
+        cancelled = true;
+        // 关闭连接以中断流
+        HttpURLConnection conn = currentConnection;
+        if (conn != null) {
+            conn.disconnect();
+        }
+        // 中断请求线程
+        Thread thread = requestThread;
+        if (thread != null) {
+            thread.interrupt();
+        }
+    }
+    
+    /**
+     * 检查当前请求是否已被取消
+     */
+    public boolean isCancelled() {
+        return cancelled;
     }
     
     /**
@@ -64,24 +93,36 @@ public class HttpClient {
      * 发送流式请求
      */
     public void sendStreamRequest(Config config, List<ChatMessage> messages, StreamCallback callback) {
-        new Thread(() -> {
+        // 重置取消标志
+        cancelled = false;
+        
+        requestThread = new Thread(() -> {
             HttpURLConnection conn = null;
+            InputStream is = null;
+            BufferedReader reader = null;
             try {
                 URL url = new URL(config.getApiUrl());
                 conn = (HttpURLConnection) url.openConnection();
+                currentConnection = conn;
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("Authorization", "Bearer " + config.getApiKey());
                 conn.setRequestProperty("Accept", "text/event-stream");
                 conn.setDoOutput(true);
-                conn.setConnectTimeout(30000);
-                conn.setReadTimeout(60000);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(30000);
                 
                 // 发送请求
                 String requestBody = buildRequestBody(config, messages);
                 try (OutputStream os = conn.getOutputStream()) {
                     os.write(requestBody.getBytes(StandardCharsets.UTF_8));
                     os.flush();
+                }
+                
+                // 检查是否在发送后已被取消
+                if (cancelled || Thread.currentThread().isInterrupted()) {
+                    callback.onCancelled();
+                    return;
                 }
                 
                 // 读取流式响应
@@ -92,38 +133,74 @@ public class HttpClient {
                     return;
                 }
                 
-                try (InputStream is = conn.getInputStream();
-                     BufferedReader reader = new BufferedReader(
-                         new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                is = conn.getInputStream();
+                reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+                
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    // 检查取消标志
+                    if (cancelled || Thread.currentThread().isInterrupted()) {
+                        callback.onCancelled();
+                        return;
+                    }
                     
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        if (line.startsWith("data: ")) {
-                            String data = line.substring(6);
-                            if (data.equals("[DONE]")) {
-                                break;
-                            }
-                            // 调试输出
-                            System.out.println("收到数据: " + data);
-                            String content = parseStreamContent(data);
-                            System.out.println("解析结果: " + content);
-                            if (content != null && !content.isEmpty()) {
-                                callback.onChunk(content);
-                            }
+                    if (line.startsWith("data: ")) {
+                        String data = line.substring(6);
+                        if (data.equals("[DONE]")) {
+                            break;
+                        }
+                        String content = parseStreamContent(data);
+                        if (content != null && !content.isEmpty()) {
+                            callback.onChunk(content);
                         }
                     }
                 }
                 
+                // 最终检查是否在完成前被取消
+                if (cancelled || Thread.currentThread().isInterrupted()) {
+                    callback.onCancelled();
+                    return;
+                }
+                
                 callback.onComplete();
                 
+            } catch (java.io.InterruptedIOException | java.net.SocketException e) {
+                // 连接被主动中断（cancel() 调用 disconnect 导致）
+                if (cancelled) {
+                    callback.onCancelled();
+                } else {
+                    callback.onError("请求超时: " + e.getMessage());
+                }
             } catch (Exception e) {
-                callback.onError("请求异常: " + e.getMessage());
+                if (cancelled || Thread.currentThread().isInterrupted()) {
+                    callback.onCancelled();
+                } else {
+                    callback.onError("请求异常: " + e.getMessage());
+                }
             } finally {
+                // 确保所有资源被释放
+                closeQuietly(reader);
+                closeQuietly(is);
                 if (conn != null) {
                     conn.disconnect();
                 }
+                currentConnection = null;
+                requestThread = null;
             }
-        }).start();
+        });
+        requestThread.start();
+    }
+    
+    /**
+     * 安全关闭 Closeable 资源
+     */
+    private void closeQuietly(Closeable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (IOException ignored) {
+            }
+        }
     }
     
     /**

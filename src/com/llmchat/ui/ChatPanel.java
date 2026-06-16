@@ -33,6 +33,7 @@ public class ChatPanel extends JPanel {
     private ModernTextArea inputArea;
     private ModernButton sendButton;
     private MessageBubble currentResponseBubble;
+    private JPanel currentBubbleWrapper;
     private StringBuilder currentResponse;
     
     private ChatPanelListener listener;
@@ -106,7 +107,14 @@ public class ChatPanel extends JPanel {
         rightPanel.setBackground(BACKGROUND_COLOR);
         
         sendButton = new ModernButton("发送");
-        sendButton.addActionListener(e -> sendMessage());
+        sendButton.addActionListener(e -> {
+            if (sendButton.isLoading()) {
+                // 正在加载时，点击按钮取消请求
+                cancelCurrentRequest();
+            } else {
+                sendMessage();
+            }
+        });
         
         rightPanel.add(Box.createVerticalGlue());
         rightPanel.add(sendButton);
@@ -124,9 +132,13 @@ public class ChatPanel extends JPanel {
     public void loadSession(String sessionId) {
         if (sessionId == null) return;
         
-        // 如果正在加载，先停止
+        // 如果正在加载，先取消当前请求
         if (sendButton.isLoading()) {
-            return;
+            httpClient.cancel();
+            // 等待取消完成后再加载新会话（简化处理：直接重置按钮状态）
+            resetSendButton();
+            currentResponseBubble = null;
+            currentBubbleWrapper = null;
         }
         
         this.currentSessionId = sessionId;
@@ -221,7 +233,8 @@ public class ChatPanel extends JPanel {
         // 清空输入框
         inputArea.clear();
         
-        // 显示加载状态
+        // 显示加载状态（按钮变为“停止”）
+        sendButton.setText("停止");
         sendButton.setLoading(true);
         
         // 准备接收响应
@@ -230,10 +243,10 @@ public class ChatPanel extends JPanel {
         currentResponseBubble = new MessageBubble(assistantMessage);
         
         // 添加响应气泡
-        JPanel bubbleWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 5));
-        bubbleWrapper.setBackground(BACKGROUND_COLOR);
-        bubbleWrapper.add(currentResponseBubble);
-        messagesPanel.add(bubbleWrapper);
+        currentBubbleWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 5));
+        currentBubbleWrapper.setBackground(BACKGROUND_COLOR);
+        currentBubbleWrapper.add(currentResponseBubble);
+        messagesPanel.add(currentBubbleWrapper);
         messagesPanel.revalidate();
         messagesPanel.repaint();
         scrollToBottom();
@@ -246,6 +259,8 @@ public class ChatPanel extends JPanel {
                 SwingUtilities.invokeLater(() -> {
                     currentResponse.append(chunk);
                     currentResponseBubble.appendContent(chunk);
+                    messagesPanel.revalidate();
+                    messagesPanel.repaint();
                     scrollToBottom();
                 });
             }
@@ -253,7 +268,7 @@ public class ChatPanel extends JPanel {
             @Override
             public void onComplete() {
                 SwingUtilities.invokeLater(() -> {
-                    sendButton.setLoading(false);
+                    resetSendButton();
                     
                     // 保存完整的响应消息
                     ChatMessage completeMessage = new ChatMessage(
@@ -263,6 +278,7 @@ public class ChatPanel extends JPanel {
                     messageHistory.add(completeMessage);
                     historyManager.addMessageToSession(currentSessionId, completeMessage);
                     currentResponseBubble = null;
+                    currentBubbleWrapper = null;
                     
                     // 通知会话更新
                     if (listener != null) {
@@ -272,13 +288,54 @@ public class ChatPanel extends JPanel {
             }
             
             @Override
+            public void onCancelled() {
+                SwingUtilities.invokeLater(() -> {
+                    resetSendButton();
+                    
+                    String partialContent = currentResponse.toString();
+                    if (!partialContent.isEmpty()) {
+                        // 保留已接收的部分响应
+                        ChatMessage partialMessage = new ChatMessage(
+                            ChatMessage.Role.ASSISTANT,
+                            partialContent
+                        );
+                        messageHistory.add(partialMessage);
+                        historyManager.addMessageToSession(currentSessionId, partialMessage);
+                    } else {
+                        // 没有收到任何内容，移除空的气泡
+                        if (currentBubbleWrapper != null) {
+                            messagesPanel.remove(currentBubbleWrapper);
+                            messagesPanel.revalidate();
+                            messagesPanel.repaint();
+                        }
+                        // 移除用户消息
+                        if (!messageHistory.isEmpty()) {
+                            ChatMessage lastMsg = messageHistory.get(messageHistory.size() - 1);
+                            if (lastMsg.getRole() == ChatMessage.Role.USER) {
+                                messageHistory.remove(messageHistory.size() - 1);
+                            }
+                        }
+                    }
+                    
+                    currentResponseBubble = null;
+                    currentBubbleWrapper = null;
+                    
+                    if (listener != null) {
+                        listener.onSessionUpdated();
+                    }
+                });
+            }
+            
+            @Override
             public void onError(String error) {
                 SwingUtilities.invokeLater(() -> {
-                    sendButton.setLoading(false);
+                    resetSendButton();
                     
                     // 移除空的响应气泡
-                    if (currentResponseBubble != null) {
-                        messagesPanel.remove(messagesPanel.getComponentCount() - 1);
+                    if (currentBubbleWrapper != null) {
+                        messagesPanel.remove(currentBubbleWrapper);
+                        messagesPanel.revalidate();
+                        messagesPanel.repaint();
                     }
                     
                     // 显示错误消息
@@ -291,9 +348,27 @@ public class ChatPanel extends JPanel {
                     if (!messageHistory.isEmpty()) {
                         messageHistory.remove(messageHistory.size() - 1);
                     }
+                    
+                    currentResponseBubble = null;
+                    currentBubbleWrapper = null;
                 });
             }
         });
+    }
+    
+    /**
+     * 取消当前正在进行的请求
+     */
+    private void cancelCurrentRequest() {
+        httpClient.cancel();
+    }
+    
+    /**
+     * 重置发送按钮状态
+     */
+    private void resetSendButton() {
+        sendButton.setText("发送");
+        sendButton.setLoading(false);
     }
     
     private void addMessageBubble(ChatMessage message, boolean isUser) {
